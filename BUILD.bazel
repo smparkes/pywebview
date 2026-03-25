@@ -1,0 +1,18 @@
+load("@pip//:requirements.bzl", "requirement")
+load("@rules_python//python:py_library.bzl", "py_library")
+
+py_library(
+    name = "pywebview",
+    srcs = glob(["webview/**/*.py"]),
+    data = glob([
+        "webview/js/**",
+        "webview/lib/**",
+    ]),
+    deps = [
+        requirement("bottle"),
+        requirement("proxy-tools"),
+        requirement("typing-extensions"),
+    ],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
