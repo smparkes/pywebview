@@ -21,6 +21,7 @@ py_library(
 py_test(
     name = "test_get_instance",
     srcs = ["tests/test_get_instance.py"],
+    size = "small",
     deps = [
         ":pywebview",
         requirement("pytest"),
