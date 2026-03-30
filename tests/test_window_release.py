@@ -108,19 +108,20 @@ def test_no_double_dealloc_on_window_close():
             f'Output (last 500 chars): {output[-500:]}'
         )
 
-        # Check no address is deallocated without a preceding alloc.
-        # An address that is deallocated, then allocated again, then
-        # deallocated again is fine (address reuse).  But dealloc
-        # without a matching alloc, or two deallocs in a row, indicates
-        # an over-release.
-        live = set()  # addresses that have been allocated but not yet deallocated
+        # Check no address we allocated is deallocated twice.
+        # We only track windows created via initWithContentRect:... —
+        # Cocoa may create internal windows through other init methods,
+        # so we ignore deallocs of addresses we never saw allocated.
+        allocated = set()  # addresses we saw allocated
+        live = set()  # addresses allocated but not yet deallocated
         for event, addr in events:
             if event == 'alloc':
+                allocated.add(addr)
                 live.add(addr)
-            elif event == 'dealloc':
+            elif event == 'dealloc' and addr in allocated:
                 assert addr in live, (
-                    f'Window {addr} deallocated without a preceding alloc '
-                    f'(double dealloc / over-release).\n'
+                    f'Window {addr} deallocated twice without a '
+                    f'preceding reallocation (over-release).\n'
                     f'Events: {events}'
                 )
                 live.discard(addr)
