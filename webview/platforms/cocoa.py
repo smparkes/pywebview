@@ -1188,11 +1188,22 @@ class BrowserView:
                 action_id = func_name + '.' + random_id
                 menu_handler.register_action(action_id, item.function)
 
+                key_equivalent = getattr(item, 'key_equivalent', '') or ''
                 menu_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-                    item.title, 'handleMenuAction:', ''
+                    item.title, 'handleMenuAction:', key_equivalent
                 )
+                key_modifiers = getattr(item, 'key_modifiers', 0)
+                if key_modifiers:
+                    menu_item.setKeyEquivalentModifierMask_(key_modifiers)
                 menu_item.setTarget_(menu_handler)
                 menu_item.setRepresentedObject_(action_id)
+                enabled_flag = getattr(item, 'enabled_flag', '') or ''
+                if enabled_flag:
+                    menu_handler.register_flagged_item(menu_item, enabled_flag)
+                    # Disable autoenable for this menu so our explicit enabled
+                    # state sticks instead of being reset each time the menu
+                    # opens.
+                    parent_menu.setAutoenablesItems_(False)
                 parent_menu.addItem_(menu_item)
             elif isinstance(item, Menu):
                 submenu = AppKit.NSMenu.alloc().init()
@@ -1382,6 +1393,10 @@ class BrowserView:
 class MenuHandler:
     def __init__(self):
         self.actions = {}
+        # Maps flag_name -> list of NSMenuItem whose enabled state follows it.
+        self.flagged_items = {}
+        # Remembered current value of each flag (for items registered later).
+        self.flags = {}
 
     def handleMenuAction_(self, sender):
         action_id = sender.representedObject()
@@ -1392,6 +1407,19 @@ class MenuHandler:
 
     def register_action(self, action_id, action_callable):
         self.actions[action_id] = action_callable
+
+    def register_flagged_item(self, menu_item, flag):
+        if not flag:
+            return
+        self.flagged_items.setdefault(flag, []).append(menu_item)
+        # Apply current value (default False = disabled until told otherwise).
+        menu_item.setEnabled_(bool(self.flags.get(flag, False)))
+
+    def set_flag(self, flag, value):
+        value = bool(value)
+        self.flags[flag] = value
+        for menu_item in self.flagged_items.get(flag, ()):  # type: ignore[attr-defined]
+            menu_item.setEnabled_(value)
 
 
 menu_handler = MenuHandler()
