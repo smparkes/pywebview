@@ -19,10 +19,13 @@ class MenuAction:
     def __init__(
         self,
         title: str,
-        function: Callable[[], Any],
+        function: Callable[[], Any] | None = None,
         key_equivalent: str = '',
         key_modifiers: int = 0,
         enabled_flag: str = '',
+        checked_flag: str = '',
+        standard_selector: str = '',
+        sf_symbol: str = '',
     ) -> None:
         self.title = title
         self.function = function
@@ -38,6 +41,18 @@ class MenuAction:
         # enabled=False (item greyed until the flag is set to True).
         # Empty string = always enabled.
         self.enabled_flag = enabled_flag
+        # Optional flag name. If set, the menu item's checked state (checkmark)
+        # is driven by the flag value set via set_menu_check(). Default missing
+        # flag = unchecked. Empty string = never checked.
+        self.checked_flag = checked_flag
+        # Optional AppKit selector (e.g. 'cut:', 'paste:'). If set, the menu
+        # item uses this selector with target=nil so Cocoa routes it to the
+        # first responder (giving correct automatic enable/disable via the
+        # responder's -respondsToSelector:/-validateUserInterfaceItem:).
+        self.standard_selector = standard_selector
+        # Optional SF Symbol name (e.g. 'plus', 'doc.on.doc'). macOS 11+ only.
+        # Ignored on older systems or other platforms.
+        self.sf_symbol = sf_symbol
 
 
 class MenuSeparator:

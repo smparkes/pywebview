@@ -1175,6 +1175,37 @@ class BrowserView:
             if isinstance(item, MenuSeparator):
                 parent_menu.addItem_(AppKit.NSMenuItem.separatorItem())
             elif isinstance(item, MenuAction):
+                key_equivalent = getattr(item, 'key_equivalent', '') or ''
+                key_modifiers = getattr(item, 'key_modifiers', 0)
+                standard_selector = getattr(item, 'standard_selector', '') or ''
+                sf_symbol = getattr(item, 'sf_symbol', '') or ''
+
+                def _apply_image(m_item):
+                    if not sf_symbol:
+                        return
+                    try:
+                        image = AppKit.NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+                            sf_symbol, None
+                        )
+                        if image is not None:
+                            m_item.setImage_(image)
+                    except Exception:
+                        pass
+
+                if standard_selector:
+                    # Use AppKit's built-in selector with nil target so Cocoa
+                    # routes the action to the first responder (e.g. the
+                    # webview for cut:/copy:/paste:). This also gives correct
+                    # automatic enable/disable via responder validation.
+                    menu_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+                        item.title, standard_selector, key_equivalent
+                    )
+                    if key_modifiers:
+                        menu_item.setKeyEquivalentModifierMask_(key_modifiers)
+                    _apply_image(menu_item)
+                    parent_menu.addItem_(menu_item)
+                    continue
+
                 # Actions must be registered before application start. Otherwise they are disabled.
                 # Menu handler is a workaround to register actions after application start
                 random_id = str(uuid.uuid4())[:6]
@@ -1188,11 +1219,9 @@ class BrowserView:
                 action_id = func_name + '.' + random_id
                 menu_handler.register_action(action_id, item.function)
 
-                key_equivalent = getattr(item, 'key_equivalent', '') or ''
                 menu_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
                     item.title, 'handleMenuAction:', key_equivalent
                 )
-                key_modifiers = getattr(item, 'key_modifiers', 0)
                 if key_modifiers:
                     menu_item.setKeyEquivalentModifierMask_(key_modifiers)
                 menu_item.setTarget_(menu_handler)
@@ -1204,6 +1233,10 @@ class BrowserView:
                     # state sticks instead of being reset each time the menu
                     # opens.
                     parent_menu.setAutoenablesItems_(False)
+                checked_flag = getattr(item, 'checked_flag', '') or ''
+                if checked_flag:
+                    menu_handler.register_checked_item(menu_item, checked_flag)
+                _apply_image(menu_item)
                 parent_menu.addItem_(menu_item)
             elif isinstance(item, Menu):
                 submenu = AppKit.NSMenu.alloc().init()
@@ -1397,6 +1430,9 @@ class MenuHandler:
         self.flagged_items = {}
         # Remembered current value of each flag (for items registered later).
         self.flags = {}
+        # Maps flag_name -> list of NSMenuItem whose checked (state) follows it.
+        self.checked_items = {}
+        self.checks = {}
 
     def handleMenuAction_(self, sender):
         action_id = sender.representedObject()
@@ -1420,6 +1456,19 @@ class MenuHandler:
         self.flags[flag] = value
         for menu_item in self.flagged_items.get(flag, ()):  # type: ignore[attr-defined]
             menu_item.setEnabled_(value)
+
+    def register_checked_item(self, menu_item, flag):
+        if not flag:
+            return
+        self.checked_items.setdefault(flag, []).append(menu_item)
+        menu_item.setState_(1 if self.checks.get(flag, False) else 0)
+
+    def set_check(self, flag, value):
+        value = bool(value)
+        self.checks[flag] = value
+        state = 1 if value else 0
+        for menu_item in self.checked_items.get(flag, ()):  # type: ignore[attr-defined]
+            menu_item.setState_(state)
 
 
 menu_handler = MenuHandler()
