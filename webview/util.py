@@ -485,14 +485,24 @@ def interop_dll_path(dll_name: str) -> str:
             else 'WebBrowserInterop.x86.dll'
         )
 
+    lib_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib')
+
+    # The net462-targeted WebView2 managed DLLs reference
+    # System.Windows.Forms.ContextMenu, removed in .NET Core. Prefer the
+    # netcoreapp3.0-targeted variant when running under coreclr.
+    if os.environ.get('PYTHONNET_RUNTIME') == 'coreclr' and dll_name.startswith(
+        'Microsoft.Web.WebView2.'
+    ):
+        coreclr_path = os.path.join(lib_dir, 'netcoreapp3.0', dll_name)
+        if os.path.exists(coreclr_path):
+            return coreclr_path
+
     # Unfrozen path
-    dll_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib', dll_name)
+    dll_path = os.path.join(lib_dir, dll_name)
     if os.path.exists(dll_path):
         return dll_path
 
-    dll_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), 'lib', 'runtimes', dll_name, 'native'
-    )
+    dll_path = os.path.join(lib_dir, 'runtimes', dll_name, 'native')
     if os.path.exists(dll_path):
         return dll_path
 
